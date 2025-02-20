@@ -8,7 +8,7 @@
             <div v-for="item in navItems" :key="item.name" class="px-3 py-2">
                 <button @click="navigate(item.route)"
                     class="flex items-center w-full px-3 py-2 text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors"
-                    :class="{ 'bg-gray-700 text-white': $route.path === item.route }">
+                    :class="{ 'bg-gray-700 text-white': isRouteActive(item.route) }">
                     <span v-html="item.icon" class="mr-3"></span>
                     <span>{{ item.name }}</span>
                 </button>
@@ -19,7 +19,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 
 /**
  * @typedef {Object} NavItem
@@ -29,6 +29,7 @@ import { useRouter } from 'vue-router'
  */
 
 const router = useRouter()
+const route = useRoute()
 const navItems = ref([
     {
         name: 'Dashboard',
@@ -56,6 +57,11 @@ const navItems = ref([
         route: '/integrations'
     }
 ])
+
+const isRouteActive = (path) => {
+    // Check if current route starts with the nav item path
+    return route.path.startsWith(path)
+}
 
 const navigate = (route) => {
     router.push(route)

@@ -47,11 +47,11 @@ import { Dialog, DialogPanel, DialogTitle, TransitionRoot, TransitionChild } fro
 defineProps({
     isOpen: {
         type: Boolean,
-        required: true
+        default: false
     },
     botName: {
         type: String,
-        required: true
+        default: ''
     }
 })
 

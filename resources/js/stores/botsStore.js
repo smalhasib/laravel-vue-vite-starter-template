@@ -1,12 +1,14 @@
 import { defineStore } from "pinia";
 import botService from "@/services/botService";
 import { useToast } from "vue-toastification";
+import axios from "axios";
 
 const toast = useToast();
 
 export const useBotsStore = defineStore("bots", {
     state: () => ({
         bots: [],
+        currentBot: null,
         loading: false,
         error: null,
     }),
@@ -18,13 +20,23 @@ export const useBotsStore = defineStore("bots", {
     actions: {
         async fetchBots() {
             try {
-                this.loading = true;
-                this.bots = await botService.getAllBots();
+                const response = await axios.get("/api/bots");
+                this.bots = response.data;
             } catch (error) {
-                toast.error("Failed to fetch bots");
-                this.error = error.message;
-            } finally {
-                this.loading = false;
+                throw error;
+            }
+        },
+
+        async fetchBot(id) {
+            try {
+                const response = await axios.get(`/api/bots/${id}`);
+                this.currentBot = response.data;
+                return response.data;
+            } catch (error) {
+                this.error =
+                    error.response?.data?.message || "Failed to fetch bot";
+                toast.error(this.error);
+                throw error;
             }
         },
 
@@ -62,6 +74,10 @@ export const useBotsStore = defineStore("bots", {
                 toast.error("Failed to delete bot");
                 throw error;
             }
+        },
+
+        clearCurrentBot() {
+            this.currentBot = null;
         },
     },
 });

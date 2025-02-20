@@ -1,6 +1,8 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 import DefaultLayout from "../layouts/DefaultLayout.vue";
+import BotsView from '@/views/bot/BotsView.vue'
+import BotView from '@/views/bot/BotView.vue'
 
 const routes = [
     {
@@ -19,8 +21,8 @@ const routes = [
             },
             {
                 path: "/bots",
-                name: "Bots",
-                component: () => import("../views/BotsView.vue"),
+                name: "bots",
+                component: BotsView
             },
             {
                 path: "/team",
@@ -36,6 +38,12 @@ const routes = [
                 path: "/integrations",
                 name: "API/Integrations",
                 component: () => import("../views/IntegrationsView.vue"),
+            },
+            {
+                path: "/bots/:id",
+                name: "bot.view",
+                component: BotView,
+                props: true,
             },
         ],
     },

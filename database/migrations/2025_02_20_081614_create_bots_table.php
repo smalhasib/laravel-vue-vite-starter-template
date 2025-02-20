@@ -14,9 +14,12 @@ return new class extends Migration
             $table->string('name');
             $table->text('description')->nullable();
             $table->boolean('is_public')->default(true);
-            $table->string('model_type');
+            // Model types: gpt-4o, gpt-4o-mini, gpt-4-turbo
+            $table->string('model_type')->comment('Available types: gpt-4o, gpt-4o-mini, gpt-4-turbo');
             $table->string('language');
-            $table->string('status');
+            // Status types: Ready, Awaiting Sources
+            $table->string('status')->comment('Available types: Ready, Awaiting Sources');
+            $table->integer('indexed_pages_count')->default(0);
             $table->integer('sources_count')->default(0);
             $table->integer('questions_count')->default(0);
             $table->timestamps();

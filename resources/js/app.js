@@ -3,7 +3,8 @@ import "../css/app.css";
 
 import { createApp } from "vue";
 import { createPinia } from "pinia";
-import Toast from "vue-toastification/dist/index.mjs";
+import Toast, { POSITION } from "vue-toastification";
+import "vue-toastification/dist/index.css";
 import App from "./App.vue";
 import router from "./router";
 import { useAuthStore } from "./stores/auth";
@@ -16,7 +17,7 @@ const authStore = useAuthStore();
 authStore.initializeAuth();
 
 const toastOptions = {
-    position: "bottom-right",
+    position: POSITION.BOTTOM_RIGHT,
     timeout: 3000,
     closeOnClick: true,
     pauseOnFocusLoss: true,
