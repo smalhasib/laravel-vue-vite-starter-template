@@ -1,10 +1,35 @@
-import './bootstrap';
-import { createApp } from 'vue';
-import App from './App.vue';
-import axios from 'axios';
+import "./bootstrap";
+import "../css/app.css";
 
-axios.defaults.baseURL = '/';
-axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
+import { createApp } from "vue";
+import { createPinia } from "pinia";
+import Toast from "vue-toastification/dist/index.mjs";
+import App from "./App.vue";
+import router from "./router";
+import { useAuthStore } from "./stores/auth";
 
 const app = createApp(App);
-app.mount('#app');
+const pinia = createPinia();
+app.use(pinia);
+
+const authStore = useAuthStore();
+authStore.initializeAuth();
+
+const toastOptions = {
+    position: "bottom-right",
+    timeout: 3000,
+    closeOnClick: true,
+    pauseOnFocusLoss: true,
+    pauseOnHover: true,
+    draggable: true,
+    draggablePercent: 0.6,
+    showCloseButtonOnHover: false,
+    hideProgressBar: false,
+    closeButton: "button",
+    icon: true,
+    rtl: false,
+};
+
+app.use(Toast, toastOptions);
+app.use(router);
+app.mount("#app");

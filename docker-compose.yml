@@ -18,7 +18,7 @@ services:
     environment:
       PMA_HOST: db
       PMA_PORT: 3306
-      PMA_USER: root
+      PMA_USER: fluent
       PMA_PASSWORD: fluent-bot
     ports:
       - "8080:80"
