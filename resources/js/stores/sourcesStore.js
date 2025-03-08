@@ -1,9 +1,11 @@
 import { defineStore } from "pinia";
 import axios from "axios";
 import { useToast } from "vue-toastification";
+import { useBotsStore } from "./botsStore";
 
 export const useSourcesStore = defineStore("sources", {
     state: () => ({
+        sources: [],
         loading: false,
         error: null,
         pollingIntervals: new Map(), // Store polling intervals by source ID
@@ -12,25 +14,22 @@ export const useSourcesStore = defineStore("sources", {
     actions: {
         async addSource(botId, sourceData) {
             const toast = useToast();
+            const botsStore = useBotsStore();
             this.loading = true;
+            this.error = null;
+
             try {
-                const formData = new FormData();
-
-                // Format boolean value explicitly
-                const formattedData = {
-                    ...sourceData,
-                    process_images: sourceData.process_images ? "1" : "0",
+                const config = {
+                    headers: {
+                        "Content-Type": "multipart/form-data",
+                    },
                 };
-
-                Object.keys(formattedData).forEach((key) => {
-                    formData.append(key, formattedData[key]);
-                });
 
                 const response = await axios.post(
                     `/api/bots/${botId}/sources`,
-                    formData
+                    sourceData,
+                    config
                 );
-
                 // Start polling for this source
                 this.startPolling(botId, response.data.data.id);
 
@@ -48,11 +47,14 @@ export const useSourcesStore = defineStore("sources", {
 
         async deleteSource(botId, sourceId) {
             const toast = useToast();
+            const botsStore = useBotsStore();
             this.loading = true;
             try {
                 await axios.delete(`/api/bots/${botId}/sources/${sourceId}`);
                 // Stop polling for this source
                 this.stopPolling(sourceId);
+                // Refresh bot data to get updated counts
+                await botsStore.refreshBotData(botId);
                 toast.success("Source deleted successfully");
             } catch (error) {
                 this.error =
@@ -66,6 +68,7 @@ export const useSourcesStore = defineStore("sources", {
 
         // Start polling for a source's status
         startPolling(botId, sourceId) {
+            const botsStore = useBotsStore();
             // If already polling, clear the interval
             this.stopPolling(sourceId);
 
@@ -77,32 +80,13 @@ export const useSourcesStore = defineStore("sources", {
                     );
                     const source = response.data;
 
-                    // If source is in a final state, stop polling
+                    // If source is in a final state, stop polling and refresh bot data
                     if (
                         source.status === "indexed" ||
                         source.status === "failed"
                     ) {
                         this.stopPolling(sourceId);
-
-                        // If indexed, calculate total chunks
-                        if (source.status === "indexed") {
-                            const totalChunks = source.documents.reduce(
-                                (sum, doc) =>
-                                    sum + (doc.indexed_chunks_count || 0),
-                                0
-                            );
-
-                            // Emit event with chunks count
-                            document.dispatchEvent(
-                                new CustomEvent("source-indexed", {
-                                    detail: {
-                                        sourceId,
-                                        botId,
-                                        totalChunks,
-                                    },
-                                })
-                            );
-                        }
+                        await botsStore.refreshBotData(botId);
                     }
 
                     // Emit status update event
@@ -137,6 +121,23 @@ export const useSourcesStore = defineStore("sources", {
                 clearInterval(intervalId);
             });
             this.pollingIntervals.clear();
+        },
+
+        async getSources(botId) {
+            this.loading = true;
+            this.error = null;
+
+            try {
+                const response = await axios.get(`/api/bots/${botId}/sources`);
+                this.sources = response.data;
+                return response.data;
+            } catch (error) {
+                this.error =
+                    error.response?.data?.message || "Failed to fetch sources";
+                throw error;
+            } finally {
+                this.loading = false;
+            }
         },
     },
 });

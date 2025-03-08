@@ -25,13 +25,15 @@ class Source extends Model
         'refresh_schedule',
         'last_refresh_at',
         'next_refresh_at',
-        'indexed_chunks_count'
+        'indexed_chunks_count',
+        'data'
     ];
 
     protected $casts = [
         'last_refresh_at' => 'datetime',
         'next_refresh_at' => 'datetime',
-        'indexed_chunks_count' => 'integer'
+        'indexed_chunks_count' => 'integer',
+        'data' => 'array'
     ];
 
     /**

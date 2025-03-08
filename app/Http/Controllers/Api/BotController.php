@@ -57,12 +57,8 @@ class BotController extends Controller
         $this->authorize('view', $bot);
         return response()->json($bot->load([
             'sources' => function ($query) {
-                $query->select('id', 'bot_id', 'type', 'status', 'refresh_schedule', 'indexed_chunks_count', 'title')
-                    ->with([
-                        'documents' => function ($q) {
-                            $q->select('id', 'source_id', 'title', 'source', 'indexed_chunks_count');
-                        }
-                    ]);
+                $query->select('id', 'bot_id', 'type', 'status', 'refresh_schedule', 'indexed_chunks_count', 'title', 'created_at')
+                    ->orderBy('created_at', 'desc');
             }
         ]));
     }

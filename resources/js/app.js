@@ -8,10 +8,12 @@ import "vue-toastification/dist/index.css";
 import App from "./App.vue";
 import router from "./router";
 import { useAuthStore } from "./stores/auth";
+import VueDOMPurifyHTML from "vue-dompurify-html";
 
 const app = createApp(App);
 const pinia = createPinia();
 app.use(pinia);
+app.use(VueDOMPurifyHTML);
 
 const authStore = useAuthStore();
 authStore.initializeAuth();

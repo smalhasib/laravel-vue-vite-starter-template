@@ -11,6 +11,8 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Http;
 
 class ProcessUrlSource implements ShouldQueue
 {
@@ -25,10 +27,11 @@ class ProcessUrlSource implements ShouldQueue
 
     /**
      * The number of seconds the job can run before timing out.
+     * Increased to accommodate delays between URL processing
      *
      * @var int
      */
-    public $timeout = 120;
+    public $timeout = 3600; // 1 hour
 
     /**
      * Create a new job instance.
@@ -37,6 +40,58 @@ class ProcessUrlSource implements ShouldQueue
         public Source $source,
         public ?string $url = null
     ) {
+    }
+
+    /**
+     * Validate if a URL is accessible and returns valid content
+     */
+    private function isValidUrl(string $url): bool
+    {
+        try {
+            // Basic URL format validation
+            if (!filter_var($url, FILTER_VALIDATE_URL)) {
+                Log::warning("Invalid URL format", ['url' => $url]);
+                return false;
+            }
+
+            // Parse URL to check scheme and host
+            $parsedUrl = parse_url($url);
+            if (!isset($parsedUrl['scheme']) || !isset($parsedUrl['host'])) {
+                Log::warning("URL missing scheme or host", ['url' => $url]);
+                return false;
+            }
+
+            // Check if scheme is http or https
+            if (!in_array($parsedUrl['scheme'], ['http', 'https'])) {
+                Log::warning("Invalid URL scheme", ['url' => $url, 'scheme' => $parsedUrl['scheme']]);
+                return false;
+            }
+
+            // Try to make a HEAD request to check if URL is accessible
+            $response = Http::withHeaders([
+                'User-Agent' => 'Mozilla/5.0 (compatible; FluentBot/1.0; +http://example.com)'
+            ])->timeout(10)->head($url);
+
+            // Check if response is successful and content type is HTML
+            if (!$response->successful()) {
+                Log::warning("URL not accessible", ['url' => $url, 'status' => $response->status()]);
+                return false;
+            }
+
+            $contentType = $response->header('Content-Type');
+            if (!str_contains(strtolower($contentType), 'text/html')) {
+                Log::warning("URL does not return HTML content", ['url' => $url, 'content_type' => $contentType]);
+                return false;
+            }
+
+            return true;
+        } catch (\Exception $e) {
+            Log::warning("Error validating URL", [
+                'url' => $url,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
     }
 
     /**
@@ -89,22 +144,37 @@ class ProcessUrlSource implements ShouldQueue
      */
     private function processUrl(ScrapingService $scrapingService, IndexingService $indexingService): void
     {
-        $url = $this->url ?? $this->source->title; // Use provided URL or source title
+        $url = $this->url ?? $this->source->title;
 
         if (!$url) {
             throw new \Exception('URL not found');
+        }
+
+        // Validate URL before processing
+        if (!$this->isValidUrl($url)) {
+            throw new \Exception("Invalid or inaccessible URL: {$url}");
         }
 
         // Scrape the URL
         Log::info("Scraping URL: {$url}", ['source_id' => $this->source->id]);
         $scrapedData = $scrapingService->scrapeUrl($url);
 
+        // Ensure we have a valid title from either user input or scraped data
+        $documentTitle = $scrapedData['title'] ?? 'Untitled';
+
         // Create document
         $document = $this->source->documents()->create([
-            'title' => $scrapedData['title'] ?? '',
+            'title' => $documentTitle,
             'content' => $scrapedData['content'],
             'source' => $url
         ]);
+
+        // Update source title if empty
+        if (empty($this->source->title)) {
+            $this->source->update([
+                'title' => $documentTitle
+            ]);
+        }
 
         // Index the data
         Log::info("Indexing data for document ID: {$document->id}");
@@ -138,18 +208,57 @@ class ProcessUrlSource implements ShouldQueue
      */
     private function processUrlList(ScrapingService $scrapingService, IndexingService $indexingService): void
     {
-        $urls = explode("\n", $this->source->title); // URLs are now stored in title, one per line
-
-        if (empty($urls)) {
-            throw new \Exception('No URLs found in source');
+        // Get file path from source data
+        $filePath = $this->source->data['file_path'] ?? null;
+        if (!$filePath || !Storage::disk('local')->exists($filePath)) {
+            throw new \Exception('Source file not found');
         }
 
-        foreach ($urls as $url) {
+        // Read and parse file contents
+        $contents = Storage::disk('local')->get($filePath);
+        $allUrls = array_filter(explode("\n", $contents), 'trim');
+
+        // Filter and validate URLs
+        $validUrls = [];
+        $invalidUrls = [];
+
+        foreach ($allUrls as $url) {
             $url = trim($url);
             if (empty($url))
                 continue;
 
+            if ($this->isValidUrl($url)) {
+                $validUrls[] = $url;
+            } else {
+                $invalidUrls[] = $url;
+            }
+        }
+
+        if (empty($validUrls)) {
+            throw new \Exception('No valid URLs found in source file');
+        }
+
+        Log::info("URL validation completed", [
+            'source_id' => $this->source->id,
+            'total_urls' => count($allUrls),
+            'valid_urls' => count($validUrls),
+            'invalid_urls' => count($invalidUrls)
+        ]);
+
+        $processedCount = 0;
+        $failedUrls = [];
+
+        foreach ($validUrls as $url) {
             try {
+                // Add a delay between requests (except for the first one)
+                if ($processedCount > 0) {
+                    Log::info("Waiting 5 seconds before processing next URL", [
+                        'source_id' => $this->source->id,
+                        'next_url' => $url
+                    ]);
+                    sleep(5);
+                }
+
                 // Scrape the URL
                 Log::info("Scraping URL from list: {$url}", ['source_id' => $this->source->id]);
                 $scrapedData = $scrapingService->scrapeUrl($url);
@@ -175,13 +284,16 @@ class ProcessUrlSource implements ShouldQueue
                     $document->update([
                         'indexed_chunks_count' => $indexingResult['chunks']
                     ]);
+                    $processedCount++;
                 }
 
                 Log::info("URL from list processed successfully", [
                     'source_id' => $this->source->id,
                     'document_id' => $document->id,
                     'url' => $url,
-                    'chunks' => $indexingResult['chunks']
+                    'chunks' => $indexingResult['chunks'],
+                    'processed_count' => $processedCount,
+                    'remaining_urls' => count($validUrls) - $processedCount
                 ]);
             } catch (\Exception $e) {
                 Log::error("Failed to process URL from list", [
@@ -189,9 +301,37 @@ class ProcessUrlSource implements ShouldQueue
                     'url' => $url,
                     'error' => $e->getMessage()
                 ]);
-                // Continue with next URL even if one fails
+                $failedUrls[] = $url;
             }
         }
+
+        // Update source data with processing results
+        $this->source->update([
+            'data' => array_merge($this->source->data, [
+                'total_urls' => count($allUrls),
+                'valid_urls' => count($validUrls),
+                'invalid_urls' => count($invalidUrls),
+                'invalid_urls_list' => $invalidUrls,
+                'processed_urls' => $processedCount,
+                'failed_urls' => count($failedUrls),
+                'failed_urls_list' => $failedUrls
+            ])
+        ]);
+
+        // If no URLs were processed successfully, mark the source as failed
+        if ($processedCount === 0) {
+            throw new \Exception('Failed to process any URLs from the list');
+        }
+
+        // Log summary
+        Log::info("URL List processing completed", [
+            'source_id' => $this->source->id,
+            'total_urls' => count($allUrls),
+            'valid_urls' => count($validUrls),
+            'invalid_urls' => count($invalidUrls),
+            'processed' => $processedCount,
+            'failed' => count($failedUrls)
+        ]);
     }
 
     /**
@@ -222,3 +362,4 @@ class ProcessUrlSource implements ShouldQueue
         };
     }
 }
+

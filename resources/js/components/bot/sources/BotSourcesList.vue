@@ -16,7 +16,10 @@ import { useSourcesStore } from '@/stores/sourcesStore';
 import { useBotsStore } from '@/stores/botsStore';
 import SourceCard from './SourceCard.vue';
 import SourceModal from './SourceModal.vue';
+import axios from 'axios';
+import { useToast } from 'vue-toastification';
 
+const toast = useToast();
 const props = defineProps({
     sources: {
         type: Array,
@@ -36,11 +39,15 @@ const handleSourceStatusUpdate = (event) => {
     const sourceIndex = props.sources.findIndex(s => s.id === updatedSource.id);
 
     if (sourceIndex !== -1) {
-        // Update the source in the array
-        props.sources[sourceIndex] = {
-            ...props.sources[sourceIndex],
+        // Update the source while maintaining the order
+        const updatedSources = [...props.sources];
+        updatedSources[sourceIndex] = {
+            ...updatedSources[sourceIndex],
             ...updatedSource
         };
+        // Sort sources by created_at in descending order
+        updatedSources.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        props.sources.splice(0, props.sources.length, ...updatedSources);
 
         // If this source is currently selected in the modal, update it
         if (selectedSource.value?.id === updatedSource.id) {
@@ -53,6 +60,9 @@ const handleSourceStatusUpdate = (event) => {
 };
 
 onMounted(() => {
+    // Sort initial sources by created_at in descending order
+    props.sources.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
     // Start polling for any non-final status sources
     props.sources.forEach(source => {
         if (source.status !== 'indexed' && source.status !== 'failed') {
@@ -70,10 +80,17 @@ onUnmounted(() => {
     document.removeEventListener('source-status-updated', handleSourceStatusUpdate);
 });
 
-const openSourceModal = (source) => {
+const openSourceModal = async (source) => {
     if (!source) return;
-    selectedSource.value = { ...source };
-    isModalOpen.value = true;
+    try {
+        // Fetch full source details including documents
+        const response = await axios.get(`/api/bots/${botsStore.currentBot.id}/sources/${source.id}`);
+        selectedSource.value = response.data;
+        isModalOpen.value = true;
+    } catch (error) {
+        console.error('Failed to fetch source details:', error);
+        toast.error('Failed to load source details');
+    }
 };
 
 const closeModal = () => {

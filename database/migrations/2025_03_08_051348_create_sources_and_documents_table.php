@@ -21,6 +21,7 @@ return new class extends Migration {
             $table->enum('status', ['queued', 'indexing', 'indexed', 'failed'])->default('queued');
             $table->enum('refresh_schedule', ['never', 'daily', 'weekly', 'monthly'])->default('never');
             $table->integer('indexed_chunks_count')->default(0);
+            $table->json('data')->nullable();
             $table->timestamps();
             $table->timestamp('last_refresh_at')->nullable();
             $table->timestamp('next_refresh_at')->nullable();

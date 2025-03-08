@@ -18,21 +18,26 @@ export const useBotsStore = defineStore("bots", {
     },
 
     actions: {
-        initializeEventListeners() {
-            document.addEventListener("source-indexed", (event) => {
-                const { botId, totalChunks } = event.detail;
-                this.updateBotChunksCount(botId, totalChunks);
-            });
-        },
+        async refreshBotData(botId) {
+            try {
+                const response = await axios.get(`/api/bots/${botId}`);
+                const updatedBot = response.data;
 
-        updateBotChunksCount(botId, newChunks) {
-            const botIndex = this.bots.findIndex((bot) => bot.id === botId);
-            if (botIndex !== -1) {
-                this.bots[botIndex].total_indexed_chunks_count += newChunks;
-            }
+                // Update bot in the bots array
+                const botIndex = this.bots.findIndex((bot) => bot.id === botId);
+                if (botIndex !== -1) {
+                    this.bots[botIndex] = updatedBot;
+                }
 
-            if (this.currentBot && this.currentBot.id === botId) {
-                this.currentBot.total_indexed_chunks_count += newChunks;
+                // Update currentBot if it's the same bot
+                if (this.currentBot && this.currentBot.id === botId) {
+                    this.currentBot = updatedBot;
+                }
+
+                return updatedBot;
+            } catch (error) {
+                console.error("Failed to refresh bot data:", error);
+                throw error;
             }
         },
 
@@ -48,7 +53,6 @@ export const useBotsStore = defineStore("bots", {
         async fetchBot(id) {
             try {
                 const response = await axios.get(`/api/bots/${id}`);
-                console.log("Bot API Response:", response.data);
                 this.currentBot = response.data;
                 return response.data;
             } catch (error) {

@@ -2,6 +2,9 @@
     <!-- URL Source Form -->
     <UrlSourceForm v-if="selectedSource === 'URL'" @cancel="selectedSource = null" @source-added="handleSourceAdded" />
 
+    <!-- URL List Source Form -->
+    <UrlListSourceForm v-else-if="selectedSource === 'URL List'" @cancel="selectedSource = null" @source-added="handleSourceAdded" />
+
     <template v-else>
         <!-- Source Types Description -->
         <p class="mt-6 text-base text-gray-700">
@@ -77,8 +80,15 @@
 <script setup>
 import { ref } from 'vue'
 import UrlSourceForm from './sources/UrlSourceForm.vue'
+import UrlListSourceForm from './sources/UrlListSourceForm.vue'
+import { LinkIcon, DocumentDuplicateIcon, GlobeAltIcon } from '@heroicons/vue/24/outline'
 
 const emit = defineEmits(['cancel', 'source-added'])
+
+// Register icons as components
+const WebIcon = GlobeAltIcon
+const ListIcon = DocumentDuplicateIcon
+const WordPressIcon = GlobeAltIcon // Using GlobeAlt as a placeholder for WordPress
 
 const expandedSections = ref({
     'Web': true // Initialize Web section as expanded
@@ -90,7 +100,13 @@ const toggleSection = (sectionName) => {
 }
 
 const selectSource = (sourceName) => {
-    selectedSource.value = sourceName
+    // Map UI source names to internal source types
+    const sourceTypeMap = {
+        'URL': 'URL',
+        'URL List': 'URL List',
+        'WordPress': 'WORDPRESS'
+    }
+    selectedSource.value = sourceTypeMap[sourceName]
 }
 
 const handleSourceAdded = () => {

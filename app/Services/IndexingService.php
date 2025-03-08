@@ -104,6 +104,45 @@ class IndexingService
     }
 
     /**
+     * Delete a single document from the remote backend
+     *
+     * @param int $userId User ID
+     * @param int $botId Bot ID
+     * @param int $sourceId Source ID
+     * @param int $documentId Document ID
+     * @param int $chunks Number of chunks to delete
+     * @return array Response containing deletion details
+     * @throws \Exception If deletion fails
+     */
+    public function deleteDocument(
+        int $userId,
+        int $botId,
+        int $sourceId,
+        int $documentId,
+        int $chunks
+    ): array {
+        $response = Http::delete('https://fluent-ai-backend.support-ai.workers.dev/fluent-bot/source-document', [
+            'userId' => $userId,
+            'botId' => $botId,
+            'sourceId' => $sourceId,
+            'documentId' => $documentId,
+            'chunks' => $chunks
+        ]);
+
+        if ($response->failed()) {
+            Log::error('Document deletion failed', [
+                'documentId' => $documentId,
+                'sourceId' => $sourceId,
+                'status' => $response->status(),
+                'body' => $response->body()
+            ]);
+            throw new \Exception("Failed to delete document: " . $response->status());
+        }
+
+        return $response->json();
+    }
+
+    /**
      * Delete all sources data from the remote backend for a bot
      *
      * @param string $userId User ID
