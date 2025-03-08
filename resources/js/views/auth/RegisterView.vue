@@ -10,16 +10,12 @@
                         placeholder="Email address" />
                 </div>
                 <div class="mb-4">
-                    <label class="block text-gray-700">Password</label>
-                    <input v-model="form.password" type="password" required
-                        class="w-full px-3 py-2 border rounded focus:outline-none focus:ring focus:border-blue-300"
+                    <PasswordInput v-model="form.password" label="Password" required autocomplete="new-password"
                         placeholder="Password" />
                 </div>
                 <div class="mb-6">
-                    <label class="block text-gray-700">Confirm Password</label>
-                    <input v-model="form.password_confirmation" type="password" required
-                        class="w-full px-3 py-2 border rounded focus:outline-none focus:ring focus:border-blue-300"
-                        placeholder="Confirm password" />
+                    <PasswordInput v-model="form.password_confirmation" label="Confirm Password" required
+                        autocomplete="new-password" placeholder="Confirm password" />
                 </div>
                 <button type="submit"
                     class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition-colors">
@@ -39,6 +35,7 @@
 import { reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
+import PasswordInput from '../../components/PasswordInput.vue'
 
 const router = useRouter()
 const auth = useAuthStore()

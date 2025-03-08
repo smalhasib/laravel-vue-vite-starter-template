@@ -18,7 +18,7 @@
         </p>
 
         <!-- New Source Button -->
-        <button @click="$emit('click')"
+        <button @click="$emit('add-source')"
             class="inline-flex items-center px-4 py-2 bg-teal-600 text-white text-base font-medium rounded-md hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-400">
             <svg class="w-5 h-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
                 <path fill-rule="evenodd"
@@ -31,5 +31,5 @@
 </template>
 
 <script setup>
-defineEmits(['click'])
+defineEmits(['add-source'])
 </script>

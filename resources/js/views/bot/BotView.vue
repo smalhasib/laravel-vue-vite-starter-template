@@ -10,66 +10,94 @@
             </router-link>
         </div>
 
-        <!-- Bot Details Card with v-if -->
-        <template v-if="bot">
+        <!-- Loading State -->
+        <div v-if="loading" class="text-center py-4">
+            <p class="text-gray-500">Loading bot details...</p>
+        </div>
+
+        <!-- Bot Details and Sources -->
+        <template v-else-if="bot">
             <BotDetailsCard :bot="bot" />
 
-            <!-- Content Sources or Empty State -->
-            <ContentSourcesSection v-if="showSourcesSection" @cancel="showSourcesSection = false" />
-            <AddSourceEmptyState v-else @click="showSourcesSection = true" />
+            <!-- Sources List - Always show if exists -->
+            <template v-if="bot.sources?.length > 0">
+                <BotSourcesList :sources="bot.sources" />
+            </template>
+
+            <!-- Add Source Section -->
+            <template v-if="showSourcesSection">
+                <SourcesSelectionSection @cancel="showSourcesSection = false" @source-added="handleSourceAdded" />
+            </template>
+            <template v-else>
+                <AddSourceSection @add-source="onAddSource" />
+            </template>
         </template>
     </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useBotsStore } from '@/stores/botsStore'
 import { useToast } from "vue-toastification"
 import BotDetailsCard from '@/components/bot/BotDetailsCard.vue'
-import AddSourceEmptyState from '@/components/bot/AddSourceEmptyState.vue'
-import ContentSourcesSection from '@/components/bot/ContentSourcesSection.vue'
+import AddSourceSection from '@/components/bot/AddSourceSection.vue'
+import SourcesSelectionSection from '@/components/bot/SourcesSelectionSection.vue'
+import BotSourcesList from '@/components/bot/sources/BotSourcesList.vue'
 
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
 const botsStore = useBotsStore()
 
-// Get bot from router state
+const loading = ref(true)
 const bot = computed(() => {
-    // Try to get from router state first
-    const routeBot = router.currentRoute.value.state?.bot
-    if (routeBot) {
-        botsStore.currentBot = routeBot // Update store
-        return routeBot
-    }
-    // Fallback to store
-    return botsStore.currentBot
+    const currentBot = botsStore.currentBot;
+    console.log('Current Bot State:', currentBot);
+    return currentBot;
 })
 
-// State to control which view to show
+// Initialize showSourcesSection based on sources count
 const showSourcesSection = ref(false)
 
+const handleSourceAdded = async () => {
+    loading.value = true
+    showSourcesSection.value = false
+    await botsStore.fetchBot(route.params.id)
+    loading.value = false
+}
+
+const onAddSource = () => {
+    console.log('Add source clicked')
+    showSourcesSection.value = true
+}
+
 onMounted(async () => {
-    // If no bot data in route state or store, fetch it
-    if (!bot.value) {
-        try {
-            await botsStore.fetchBot(route.params.id)
-            if (!botsStore.currentBot) {
-                toast.error("Bot not found")
-                router.push('/bots')
-                return
-            }
-        } catch (error) {
-            toast.error(error.response?.data?.message || "Failed to fetch bot details")
-            router.push('/bots')
-            return
-        }
+    const routeBot = router.currentRoute.value.state?.bot
+
+    // Set initial bot from route state
+    if (routeBot) {
+        botsStore.currentBot = routeBot
+        // Show sources section initially if no sources
+        showSourcesSection.value = !routeBot.sources?.length
+        loading.value = false
     }
 
-    // Show sources section only on initial navigation when no sources
-    const hasNoSources = !bot.value?.sources?.length
-    const isInitialNavigation = router.options.history.state.forward === null
-    showSourcesSection.value = hasNoSources && isInitialNavigation
+    // Always fetch fresh bot data
+    try {
+        loading.value = true
+        await botsStore.fetchBot(route.params.id)
+        // Show sources section if no sources
+        showSourcesSection.value = !botsStore.currentBot.sources?.length
+    } catch (error) {
+        toast.error(error.response?.data?.message || "Failed to fetch bot details")
+        router.push('/bots')
+    } finally {
+        loading.value = false
+    }
+})
+
+onUnmounted(() => {
+    botsStore.clearCurrentBot()
 })
 </script>

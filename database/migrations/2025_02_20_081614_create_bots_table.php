@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     public function up(): void
     {
         Schema::create('bots', function (Blueprint $table) {
@@ -19,9 +18,9 @@ return new class extends Migration
             $table->string('language');
             // Status types: Ready, Awaiting Sources
             $table->string('status')->comment('Available types: Ready, Awaiting Sources');
-            $table->integer('indexed_pages_count')->default(0);
             $table->integer('sources_count')->default(0);
             $table->integer('questions_count')->default(0);
+            $table->integer('total_indexed_chunks_count')->default(0);
             $table->timestamps();
         });
     }

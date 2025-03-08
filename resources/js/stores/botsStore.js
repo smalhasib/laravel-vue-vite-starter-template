@@ -18,6 +18,24 @@ export const useBotsStore = defineStore("bots", {
     },
 
     actions: {
+        initializeEventListeners() {
+            document.addEventListener("source-indexed", (event) => {
+                const { botId, totalChunks } = event.detail;
+                this.updateBotChunksCount(botId, totalChunks);
+            });
+        },
+
+        updateBotChunksCount(botId, newChunks) {
+            const botIndex = this.bots.findIndex((bot) => bot.id === botId);
+            if (botIndex !== -1) {
+                this.bots[botIndex].total_indexed_chunks_count += newChunks;
+            }
+
+            if (this.currentBot && this.currentBot.id === botId) {
+                this.currentBot.total_indexed_chunks_count += newChunks;
+            }
+        },
+
         async fetchBots() {
             try {
                 const response = await axios.get("/api/bots");
@@ -30,6 +48,7 @@ export const useBotsStore = defineStore("bots", {
         async fetchBot(id) {
             try {
                 const response = await axios.get(`/api/bots/${id}`);
+                console.log("Bot API Response:", response.data);
                 this.currentBot = response.data;
                 return response.data;
             } catch (error) {
@@ -73,6 +92,18 @@ export const useBotsStore = defineStore("bots", {
             } catch (error) {
                 toast.error("Failed to delete bot");
                 throw error;
+            }
+        },
+
+        incrementSourcesCount() {
+            if (this.currentBot) {
+                this.currentBot.sources_count++;
+                const botIndex = this.bots.findIndex(
+                    (b) => b.id === this.currentBot.id
+                );
+                if (botIndex !== -1) {
+                    this.bots[botIndex].sources_count++;
+                }
             }
         },
 

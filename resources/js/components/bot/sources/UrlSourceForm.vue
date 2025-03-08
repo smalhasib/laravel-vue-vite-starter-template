@@ -40,7 +40,7 @@
                                             d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                                     </svg>
                                 </div>
-                                <input type="url" v-model="sourceUrl" @input="validateUrl"
+                                <input type="url" v-model="formData.url" @input="validateUrl"
                                     class="pl-10 block w-full border border-gray-200 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-base py-2"
                                     placeholder="https://example.com/page/">
                             </div>
@@ -55,7 +55,7 @@
                             <span class="text-base text-gray-500">Optional</span>
                         </div>
                         <div class="mt-1">
-                            <input type="text"
+                            <input type="text" v-model="formData.title"
                                 class="block w-full border border-gray-200 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-base py-2 px-3"
                                 placeholder="Enter source title">
                             <p class="mt-2 text-gray-500">Title of source displayed alongside answers. Defaults to page
@@ -67,11 +67,11 @@
                     <div>
                         <label class="block text-base text-gray-700 mb-1">Scheduled refresh</label>
                         <div class="mt-1">
-                            <Listbox v-model="selectedRefresh">
+                            <Listbox v-model="formData.refresh_schedule">
                                 <div class="relative">
                                     <ListboxButton
                                         class="relative w-full border border-gray-200 rounded-md py-2 pl-3 pr-10 text-left focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
-                                        <span class="block truncate text-base">{{ selectedRefresh }}</span>
+                                        <span class="block truncate text-base">{{ formData.refresh_schedule }}</span>
                                         <span
                                             class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
                                             <ChevronUpDownIcon class="h-5 w-5 text-gray-400" aria-hidden="true" />
@@ -107,42 +107,17 @@
                                 interval.</p>
                         </div>
                     </div>
-
-                    <!-- Learn from Images Option -->
-                    <div class="bg-gray-50 rounded-lg p-4">
-                        <div class="flex items-start">
-                            <div class="flex h-5 items-center">
-                                <input type="checkbox"
-                                    class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                            </div>
-                            <div class="ml-3">
-                                <h3 class="text-base font-medium text-gray-900 flex items-center">
-                                    Learn from public images in HTML/Markdown (BETA)
-                                    <span
-                                        class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                                        Pro
-                                    </span>
-                                </h3>
-                                <p class="mt-2 text-gray-600">
-                                    Only recommended for documentation pages with screenshots or diagrams.
-                                    Processing images significantly increases indexing time and source page usage.
-                                    <a href="#" class="text-blue-600 hover:text-blue-800">Learn more about image
-                                        processing</a>.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
 
         <!-- Action Buttons -->
         <div class="px-6 py-4 bg-gray-50 flex justify-end space-x-4 rounded-b-lg border-t border-gray-100">
-            <button @click="$emit('cancel')"
+            <button @click="closeForm"
                 class="px-4 py-2 text-sm font-medium text-gray-700 bg-white rounded-md border border-gray-300 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
                 Cancel
             </button>
-            <button :disabled="!isValidUrl" :class="[
+            <button :disabled="!isValidUrl" @click="submitForm" :class="[
                 'inline-flex items-center px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2',
                 isValidUrl
                     ? 'bg-teal-600 text-white hover:bg-teal-800 focus:ring-teal-400'
@@ -155,24 +130,58 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref } from 'vue';
 import { Listbox, ListboxButton, ListboxOptions, ListboxOption } from '@headlessui/vue'
 import { CheckIcon, ChevronUpDownIcon } from '@heroicons/vue/24/solid'
+import { useSourcesStore } from '@/stores/sourcesStore';
+import { useBotsStore } from '@/stores/botsStore';
 
-defineEmits(['cancel'])
+const emit = defineEmits(['cancel', 'source-added']);
+const sourcesStore = useSourcesStore();
+const botsStore = useBotsStore();
 
-const sourceUrl = ref('')
-const isValidUrl = ref(false)
+const loading = ref(false);
+const isValidUrl = ref(false);
+const formData = ref({
+    type: 'URL',
+    title: '',
+    url: '',
+    refresh_schedule: 'never'
+});
 
 const refreshOptions = ['Never', 'Monthly', 'Weekly', 'Daily']
-const selectedRefresh = ref(refreshOptions[0])
 
 const validateUrl = () => {
     try {
-        const url = new URL(sourceUrl.value)
+        const url = new URL(formData.value.url)
         isValidUrl.value = url.protocol === 'http:' || url.protocol === 'https:'
     } catch {
         isValidUrl.value = false
     }
 }
+
+const closeForm = () => {
+    emit('close');
+}
+
+const submitForm = async () => {
+    loading.value = true;
+    try {
+        // Create source data with optional title
+        const sourceData = {
+            type: formData.value.type,
+            title: formData.value.title || '', // Send empty string if no title provided
+            url: formData.value.url,
+            refresh_schedule: formData.value.refresh_schedule.toLowerCase()
+        };
+
+        await sourcesStore.addSource(botsStore.currentBot.id, sourceData);
+        botsStore.incrementSourcesCount();
+        emit('source-added');
+    } catch (error) {
+        console.error('Error adding source:', error);
+    } finally {
+        loading.value = false;
+    }
+};
 </script>
